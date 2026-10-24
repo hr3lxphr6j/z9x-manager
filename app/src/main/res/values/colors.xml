@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Single GMUI palette, from firmware com.android.newsettings.
+      Every view in the shell reads these tokens (via GmuiPalette) or @color.
+      Blue is status only — enabled (#FF4A7DFF) and connected (#FF2758FF).
+      It is never used as focus chrome. Focus is the white fill with black text.
+    -->
+    <color name="gmui_focus_fill">#FFFFFFFF</color>
+    <color name="gmui_focus_text">#FF000000</color>
+    <color name="gmui_row_selected">#51FFFFFF</color>
+    <color name="gmui_row_idle">#24FFFFFF</color>
+    <color name="gmui_text_primary">#FFFFFFFF</color>
+    <color name="gmui_text_secondary">#A6FFFFFF</color>
+    <color name="gmui_panel">#A6000000</color>
+    <color name="gmui_window">#FA292929</color>
+    <color name="gmui_status_enabled">#FF4A7DFF</color>
+    <color name="gmui_status_connected">#FF2758FF</color>
+</resources>

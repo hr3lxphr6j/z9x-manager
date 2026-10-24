@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Z9x" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/gmui_window</item>
+        <item name="android:colorBackground">@color/gmui_window</item>
+        <item name="android:statusBarColor">@color/gmui_window</item>
+        <item name="android:navigationBarColor">@color/gmui_window</item>
+        <item name="android:textColor">@color/gmui_text_primary</item>
+        <item name="android:textColorPrimary">@color/gmui_text_primary</item>
+        <item name="android:textColorSecondary">@color/gmui_text_secondary</item>
+        <!--
+          DeviceDefault's accent is blue and would paint focus chrome.
+          Focus stays the white fill; status blue is applied only in code.
+        -->
+        <item name="android:colorAccent">@color/gmui_focus_fill</item>
+        <item name="android:colorControlActivated">@color/gmui_focus_fill</item>
+        <item name="android:colorControlHighlight">@color/gmui_row_selected</item>
+    </style>
+</resources>

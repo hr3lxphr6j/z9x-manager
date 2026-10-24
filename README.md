@@ -3,7 +3,7 @@
 面向极米投影（GMUI / Z9X 等）的遥控器管理 App。界面按极米设置的左右分栏来做，不是 Leanback，也不是手机 Material。
 
 包名：`local.z9x.manager`  
-当前版本：**1.2.0**
+当前版本：**1.2.1**
 
 功能：
 
@@ -37,7 +37,7 @@
 ./build.sh
 
 # 产物：
-#   app/build/outputs/apk/named/Z9XManager-v1.2.0.apk
+#   app/build/outputs/apk/named/Z9XManager-v1.2.1.apk
 #   （亦保留 app/build/outputs/apk/release/*-release.apk）
 ```
 
@@ -71,7 +71,7 @@ GitHub Actions 可用 Secrets：`STORE_PASSWORD` / `KEY_PASSWORD` / `KEYSTORE_BA
 
 ## 实机侧载（GMUI）
 
-1. 将 `Z9XManager-v1.2.0.apk` 拷到 U 盘 → 文件管理器安装（允许未知来源）
+1. 将 `Z9XManager-v1.2.1.apk` 拷到 U 盘 → 文件管理器安装（允许未知来源）
 2. 打开 **极米助手**。左栏是「网络 ADB / 预装包 / Aerial」，右栏是整行操作。左右键在两栏之间移动，上下键在行之间移动，确认键执行。日志和命令不能直接划选，用对应的「复制…」行。
 3. 若需完整 debloat / Aerial 设为桌面：电脑 `adb connect <IP>:5555` 后执行 App 内「复制」给出的命令
 
