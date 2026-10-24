@@ -44,7 +44,7 @@ jobs:
           fi
           echo "sdkmanager=$SM"
           yes | "$SM" --licenses >/dev/null || true
-          "$SM" --install "platforms;android-34" "build-tools;34.0.0"
+          "$SM" --install "platforms;android-34" "build-tools;36.0.0"
 
       - name: Resolve version
         id: ver

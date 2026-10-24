@@ -25,9 +25,11 @@
 
 需要：
 
-- **JDK 17**
-- Android SDK：`platforms;android-34`、`build-tools;34.0.0`（或更新）
+- **JDK 17**（或更新）
+- Android SDK：`platforms;android-34`、`build-tools;36.0.0`（AGP 9.4 默认构建工具）
 - `ANDROID_HOME` / `sdk.dir`（本地可写 `local.properties`）
+
+工程使用 Android Gradle Plugin 9.4 的内置 Kotlin（不要再应用 `org.jetbrains.kotlin.android`）。JVM 目标为 17。
 
 ```bash
 ./gradlew assembleRelease
