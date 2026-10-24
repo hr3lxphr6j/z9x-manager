@@ -18,10 +18,10 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -32,7 +32,9 @@ import kotlin.math.roundToInt
 /**
  * 极米助手 / Z9X Manager — two-pane GMUI remote UI.
  *
- * Left categories, right full-width rows. Focus is a white bar with black text.
+ * Left categories, right full-width rows, log panel underneath.
+ * Focus is a white bar with black text. Every color comes from [GmuiPalette]
+ * (`res/values/colors.xml`). Blue is status text only, never focus chrome.
  * Does NOT: xgimi_ssh, write /data/ssh, write adb_keys, Magisk, firmware repack.
  * pm uninstall / Aerial shell config usually need adb shell; app tries then exports cmds.
  */
@@ -58,7 +60,7 @@ class MainActivity : Activity(), InstallReceiver.Callback {
         private const val AERIAL_URL_FALLBACK =
             "https://aerial.qust.me/aerial-standard.apk"
 
-        private const val APP_VERSION = "1.2.0"
+        private const val APP_VERSION = "1.2.1"
 
         private const val TAB_ADB = 0
         private const val TAB_PKGS = 1
@@ -83,43 +85,48 @@ class MainActivity : Activity(), InstallReceiver.Callback {
     private val categorySubs = arrayOfNulls<TextView>(3)
 
     private lateinit var aerialApk: File
+    private lateinit var gmui: GmuiPalette
+    private lateinit var toastView: TextView
+    private val toastHide = Runnable {
+        if (::toastView.isInitialized) toastView.visibility = View.GONE
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        gmui = GmuiPalette(this)
         InstallReceiver.setCallback(this)
         aerialApk = File(getExternalFilesDir(null) ?: filesDir, "aerial-standard.apk")
 
-        val bg = 0xFA292929.toInt()
-        window.decorView.setBackgroundColor(bg)
-        window.statusBarColor = bg
-        window.navigationBarColor = bg
+        window.decorView.setBackgroundColor(gmui.window)
+        window.statusBarColor = gmui.window
+        window.navigationBarColor = gmui.window
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(bg)
+            setBackgroundColor(gmui.window)
         }
 
         val left = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xA6000000.toInt())
+            setBackgroundColor(gmui.panel)
             val pad = dp(16)
             setPadding(pad, dp(20), dp(12), pad)
         }
         left.addView(TextView(this).apply {
             text = "极米助手"
-            setTextColor(0xFFFFFFFF.toInt())
+            setTextColor(gmui.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
         })
         left.addView(TextView(this).apply {
             text = APP_VERSION
-            setTextColor(0xA6FFFFFF.toInt())
+            setTextColor(gmui.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setPadding(0, dp(2), 0, 0)
         })
         left.addView(TextView(this).apply {
             text = "左右切换栏 · 上下选行 · 确认执行"
-            setTextColor(0xA6FFFFFF.toInt())
+            setTextColor(gmui.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(0, dp(8), 0, dp(16))
         })
@@ -127,11 +134,16 @@ class MainActivity : Activity(), InstallReceiver.Callback {
         addCategory(left, TAB_PKGS, "预装包", "卸载与恢复")
         addCategory(left, TAB_AERIAL, "Aerial", "下载与桌面")
 
-        val divider = View(this).apply { setBackgroundColor(0x24FFFFFF) }
+        val divider = View(this).apply { setBackgroundColor(gmui.rowIdle) }
 
+        val rightPadStart = dp(12)
+        val rightPadEnd = dp(16)
+        val rightPadBottom = dp(12)
         val right = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(16), dp(16), dp(12))
+            setBackgroundColor(gmui.window)
+            setPadding(rightPadStart, dp(16), rightPadEnd, rightPadBottom)
+            clipToPadding = false
         }
         right.addView(buildDeviceHeader())
 
@@ -157,7 +169,15 @@ class MainActivity : Activity(), InstallReceiver.Callback {
                 1f,
             ),
         )
-        right.addView(buildLogPanel())
+        val logPanel = buildLogPanel()
+        (logPanel.layoutParams as LinearLayout.LayoutParams).apply {
+            // Bleed the log panel through the column padding so the panel
+            // token fills the bottom pane edge to edge, same as the left rail.
+            leftMargin = -rightPadStart
+            rightMargin = -rightPadEnd
+            bottomMargin = -rightPadBottom
+        }
+        right.addView(logPanel)
 
         root.addView(
             left,
@@ -167,8 +187,41 @@ class MainActivity : Activity(), InstallReceiver.Callback {
             divider,
             LinearLayout.LayoutParams(dp(1), ViewGroup.LayoutParams.MATCH_PARENT),
         )
+        toastView = TextView(this).apply {
+            setTextColor(gmui.textPrimary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            gravity = Gravity.CENTER
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+            // Selected-row fill stays visible on both the window and the log panel.
+            background = rounded(gmui.rowSelected)
+            visibility = View.GONE
+            isFocusable = false
+            isFocusableInTouchMode = false
+        }
+        val rightFrame = FrameLayout(this).apply {
+            setBackgroundColor(gmui.window)
+            addView(
+                right,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                ),
+            )
+            addView(
+                toastView,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM,
+                ).apply {
+                    leftMargin = dp(16)
+                    rightMargin = dp(16)
+                    bottomMargin = dp(16)
+                },
+            )
+        }
         root.addView(
-            right,
+            rightFrame,
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 6.8f),
         )
 
@@ -185,6 +238,7 @@ class MainActivity : Activity(), InstallReceiver.Callback {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(toastHide)
         InstallReceiver.setCallback(null)
         super.onDestroy()
     }
@@ -196,17 +250,17 @@ class MainActivity : Activity(), InstallReceiver.Callback {
             isFocusable = false
         }
         deviceTitle = TextView(this).apply {
-            setTextColor(0xFFFFFFFF.toInt())
+            setTextColor(gmui.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
             setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
         }
         deviceMeta = TextView(this).apply {
-            setTextColor(0xA6FFFFFF.toInt())
+            setTextColor(gmui.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setPadding(0, dp(2), 0, 0)
         }
         deviceAdb = TextView(this).apply {
-            setTextColor(0xA6FFFFFF.toInt())
+            setTextColor(gmui.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setPadding(0, dp(4), 0, 0)
         }
@@ -219,17 +273,18 @@ class MainActivity : Activity(), InstallReceiver.Callback {
     private fun buildLogPanel(): View {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            setBackgroundColor(gmui.panel)
             setPadding(dp(20), dp(8), dp(12), 0)
             isFocusable = false
         }
         panel.addView(TextView(this).apply {
             text = "输出"
-            setTextColor(0xA6FFFFFF.toInt())
+            setTextColor(gmui.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             isFocusable = false
         })
         logView = TextView(this).apply {
-            setTextColor(0xE6FFFFFF.toInt())
+            setTextColor(gmui.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.MONOSPACE
             setTextIsSelectable(false)
@@ -285,6 +340,7 @@ class MainActivity : Activity(), InstallReceiver.Callback {
             isFocusable = true
             isFocusableInTouchMode = true
             isClickable = true
+            defaultFocusHighlightEnabled = false
             descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             setOnClickListener { selectTab(index, focusRight = true) }
             setOnFocusChangeListener { _, hasFocus ->
@@ -369,14 +425,9 @@ class MainActivity : Activity(), InstallReceiver.Callback {
             val title = categoryTitles[i] ?: continue
             val sub = categorySubs[i]
             val focused = row.hasFocus()
-            val fill = when {
-                focused -> 0xFFFFFFFF.toInt()
-                i == tab -> 0x51FFFFFF
-                else -> 0x24FFFFFF
-            }
-            row.background = rounded(fill)
-            title.setTextColor(if (focused) 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
-            sub?.setTextColor(if (focused) 0x99000000.toInt() else 0xA6FFFFFF.toInt())
+            row.background = rounded(gmui.rowFill(focused, selected = i == tab))
+            title.setTextColor(gmui.titleOn(focused))
+            sub?.setTextColor(gmui.subtitleOn(focused))
         }
     }
 
@@ -481,6 +532,7 @@ class MainActivity : Activity(), InstallReceiver.Callback {
                 subtitle = "${entry.pkg}  ·  $status",
                 status = shortPkgStatus(status),
                 statusActive = status.contains("启用"),
+                selected = { entry.pkg in checkedPkgs },
                 titleOut = titleViewHolder,
             ) {
                 if (!checkedPkgs.add(entry.pkg)) checkedPkgs.remove(entry.pkg)
@@ -708,7 +760,7 @@ class MainActivity : Activity(), InstallReceiver.Callback {
                 instanceFollowRedirects = true
                 connectTimeout = 20_000
                 readTimeout = 120_000
-                setRequestProperty("User-Agent", "Z9X-Manager/1.2")
+                setRequestProperty("User-Agent", "Z9X-Manager/1.2.1")
             }
             val code = conn.responseCode
             if (code == HttpURLConnection.HTTP_MOVED_PERM ||
@@ -865,7 +917,7 @@ class MainActivity : Activity(), InstallReceiver.Callback {
     private fun addSection(text: String) {
         actions.addView(TextView(this).apply {
             this.text = text
-            setTextColor(0xFFFFFFFF.toInt())
+            setTextColor(gmui.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             setTypeface(Typeface.SANS_SERIF, Typeface.BOLD)
             setPadding(dp(20), dp(12), dp(12), dp(2))
@@ -876,7 +928,7 @@ class MainActivity : Activity(), InstallReceiver.Callback {
     private fun addHint(text: String) {
         actions.addView(TextView(this).apply {
             this.text = text
-            setTextColor(0xA6FFFFFF.toInt())
+            setTextColor(gmui.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setPadding(dp(20), dp(2), dp(12), dp(8))
             isFocusable = false
@@ -891,12 +943,12 @@ class MainActivity : Activity(), InstallReceiver.Callback {
         }
         row.addView(TextView(this).apply {
             text = label
-            setTextColor(0xFFFFFFFF.toInt())
+            setTextColor(gmui.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
         })
         row.addView(TextView(this).apply {
             text = value
-            setTextColor(if (active) 0xFF4A7DFF.toInt() else 0xA6FFFFFF.toInt())
+            setTextColor(gmui.statusOn(focused = false, active = active))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(0, dp(2), 0, 0)
         })
@@ -917,6 +969,7 @@ class MainActivity : Activity(), InstallReceiver.Callback {
         subtitle: String? = null,
         status: String? = null,
         statusActive: Boolean = false,
+        selected: () -> Boolean = { false },
         titleOut: Array<TextView?>? = null,
         onClick: () -> Unit,
     ) {
@@ -954,8 +1007,8 @@ class MainActivity : Activity(), InstallReceiver.Callback {
             isFocusable = true
             isFocusableInTouchMode = true
             isClickable = true
+            defaultFocusHighlightEnabled = false
             descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-            setOnClickListener { onClick() }
         }
         row.addView(
             textCol,
@@ -972,18 +1025,16 @@ class MainActivity : Activity(), InstallReceiver.Callback {
         }
         fun paint() {
             val focused = row.hasFocus()
-            row.background = rounded(if (focused) 0xFFFFFFFF.toInt() else 0x24FFFFFF)
-            titleView.setTextColor(if (focused) 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
-            subView?.setTextColor(if (focused) 0x99000000.toInt() else 0xA6FFFFFF.toInt())
-            statusView?.setTextColor(
-                when {
-                    focused -> 0xFF000000.toInt()
-                    statusActive -> 0xFF4A7DFF.toInt()
-                    else -> 0xA6FFFFFF.toInt()
-                },
-            )
+            row.background = rounded(gmui.rowFill(focused, selected()))
+            titleView.setTextColor(gmui.titleOn(focused))
+            subView?.setTextColor(gmui.subtitleOn(focused))
+            statusView?.setTextColor(gmui.statusOn(focused, statusActive))
         }
         paint()
+        row.setOnClickListener {
+            onClick()
+            paint()
+        }
         row.setOnFocusChangeListener { _, hasFocus ->
             paint()
             if (hasFocus && tab in 0..2) {
@@ -1040,7 +1091,7 @@ class MainActivity : Activity(), InstallReceiver.Callback {
         } else {
             "网络 ADB 未打开  ·  $port / $pers"
         }
-        deviceAdb.setTextColor(if (on) 0xFF4A7DFF.toInt() else 0xA6FFFFFF.toInt())
+        deviceAdb.setTextColor(if (on) gmui.statusConnected else gmui.textSecondary)
     }
 
     private fun pkgStatus(pm: PackageManager, pkg: String): String {
@@ -1094,7 +1145,11 @@ class MainActivity : Activity(), InstallReceiver.Callback {
     }
 
     private fun toast(msg: String) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        toastView.text = msg
+        toastView.visibility = View.VISIBLE
+        toastView.bringToFront()
+        handler.removeCallbacks(toastHide)
+        handler.postDelayed(toastHide, 2_200)
     }
 
     private fun refuseIfBusy(): Boolean {
