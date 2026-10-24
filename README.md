@@ -1,9 +1,9 @@
 # 极米助手 / Z9X Manager
 
-面向极米投影（GMUI / Z9X 等）的 **Leanback 友好** 管理 App。
+面向极米投影（GMUI / Z9X 等）的遥控器管理 App。界面按极米设置的左右分栏来做，不是 Leanback，也不是手机 Material。
 
 包名：`local.z9x.manager`  
-当前版本：**1.1.0**（Gradle + Kotlin 重构）
+当前版本：**1.2.0**
 
 功能：
 
@@ -25,9 +25,11 @@
 
 需要：
 
-- **JDK 17**
-- Android SDK：`platforms;android-34`、`build-tools;34.0.0`（或更新）
+- **JDK 17**（或更新）
+- Android SDK：`platforms;android-34`、`build-tools;36.0.0`（AGP 9.4 默认构建工具）
 - `ANDROID_HOME` / `sdk.dir`（本地可写 `local.properties`）
+
+工程使用 Android Gradle Plugin 9.4 的内置 Kotlin（不要再应用 `org.jetbrains.kotlin.android`）。JVM 目标为 17。
 
 ```bash
 ./gradlew assembleRelease
@@ -35,7 +37,7 @@
 ./build.sh
 
 # 产物：
-#   app/build/outputs/apk/named/Z9XManager-v1.1.0.apk
+#   app/build/outputs/apk/named/Z9XManager-v1.2.0.apk
 #   （亦保留 app/build/outputs/apk/release/*-release.apk）
 ```
 
@@ -69,8 +71,8 @@ GitHub Actions 可用 Secrets：`STORE_PASSWORD` / `KEY_PASSWORD` / `KEYSTORE_BA
 
 ## 实机侧载（GMUI）
 
-1. 将 `Z9XManager-v1.1.0.apk` 拷到 U 盘 → 文件管理器安装（允许未知来源）
-2. 打开 **极米助手** → ① 网络 ADB / ② 预装包 / ③ Aerial
+1. 将 `Z9XManager-v1.2.0.apk` 拷到 U 盘 → 文件管理器安装（允许未知来源）
+2. 打开 **极米助手**。左栏是「网络 ADB / 预装包 / Aerial」，右栏是整行操作。左右键在两栏之间移动，上下键在行之间移动，确认键执行。日志和命令不能直接划选，用对应的「复制…」行。
 3. 若需完整 debloat / Aerial 设为桌面：电脑 `adb connect <IP>:5555` 后执行 App 内「复制」给出的命令
 
 ### Aerial 配置参考（需 adb shell）
