@@ -1,0 +1,91 @@
+name: Build and Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version name without v prefix (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install platform 28 and build-tools 34.0.0
+        run: |
+          sdkmanager --install "platforms;android-28" "build-tools;34.0.0"
+          yes | sdkmanager --licenses || true
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="${{ github.event.inputs.version || '1.0.0' }}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          echo "JAVA_HOME=${JAVA_HOME}"
+          export ANDROID_SDK_ROOT="${ANDROID_HOME}"
+          export JDK11="${JAVA_HOME}"
+          sed -i "s/^VERSION=.*/VERSION=\"${{ steps.ver.outputs.version }}\"/" build.sh
+          chmod +x build.sh
+          ./build.sh
+          ls -la build/apk/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Z9XManager-v${{ steps.ver.outputs.version }}
+          path: build/apk/Z9XManager-v*.apk
+
+      - name: SHA256
+        id: sha
+        run: |
+          APK=$(ls build/apk/Z9XManager-v*.apk | head -1)
+          echo "apk=$(basename "$APK")" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$APK" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Z9X Manager ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          files: build/apk/Z9XManager-v*.apk
+          body: |
+            极米助手 / Z9X Manager `${{ steps.ver.outputs.tag }}`
+
+            - 包名：`local.z9x.manager`
+            - APK：`${{ steps.sha.outputs.apk }}`
+            - SHA256：`${{ steps.sha.outputs.sha256 }}`
+
+            侧载后可用：网络 ADB、可选预装卸载/恢复、Aerial 下载安装与配置命令导出。
+            **不含**售后 SSH / adb_keys / Magisk。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
