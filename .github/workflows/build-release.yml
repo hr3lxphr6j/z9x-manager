@@ -27,8 +27,24 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/cmdline-tools/16.0/bin:$ANDROID_HOME/platform-tools:$PATH"
+          # Prefer whatever cmdline-tools layout the runner has
+          if command -v sdkmanager >/dev/null 2>&1; then
+            SM="$(command -v sdkmanager)"
+          elif [[ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]]; then
+            SM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          else
+            SM="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -1)"
+          fi
+          echo "sdkmanager=$SM"
+          yes | "$SM" --licenses >/dev/null || true
+          "$SM" --install "platforms;android-34" "build-tools;34.0.0"
 
       - name: Resolve version
         id: ver
@@ -40,9 +56,7 @@ jobs:
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "tag=v$V" >> "$GITHUB_OUTPUT"
-          # Keep Gradle versionName in sync when dispatching a different version
           sed -i "s/versionName = \".*\"/versionName = \"$V\"/" app/build.gradle.kts
-          # Bump versionCode roughly from dotted version (e.g. 1.1.0 -> 110)
           CODE=$(echo "$V" | awk -F. '{printf "%d", ($1*100)+($2*10)+$3}')
           sed -i "s/versionCode = .*/versionCode = $CODE/" app/build.gradle.kts
 
@@ -50,6 +64,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build release APK
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Collect APK
