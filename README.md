@@ -3,6 +3,8 @@
 面向极米投影（GMUI / Z9X 等）的 **Leanback 友好** 管理 App。
 
 包名：`local.z9x.manager`  
+当前版本：**1.1.0**（Gradle + Kotlin 重构）
+
 功能：
 
 1. **开启网络 ADB** — best-effort `setprop` `persist/service.adb.tcp.port=5555` 并尝试拉起 `adbd`（与公开 Z7X-ADB / Z9X Helper 同类，失败安全）
@@ -19,26 +21,55 @@
 
 本 App 以普通应用身份运行。多数 `pm` / `pm grant` / `disable-user` 需要 **已授权的网络 ADB（shell）**。UI 会先尝试本机执行，失败则给出可复制的 `adb` 命令。
 
-## 构建
+## 构建（Gradle + Kotlin）
 
-无 Gradle。需要：
+需要：
 
-- JDK **11**（`JDK11` 环境变量，默认 `/workspace/jdk-11.0.25+9`）
-- Android SDK：`platforms;android-28`、`build-tools;34.0.0`
-- `ANDROID_SDK_ROOT` 或 `ANDROID_HOME`
+- **JDK 17**
+- Android SDK：`platforms;android-34`、`build-tools;34.0.0`（或更新）
+- `ANDROID_HOME` / `sdk.dir`（本地可写 `local.properties`）
 
 ```bash
+./gradlew assembleRelease
+# 或
 ./build.sh
-# 产物：build/apk/Z9XManager-v1.0.0.apk
+
+# 产物：
+#   app/build/outputs/apk/named/Z9XManager-v1.1.0.apk
+#   （亦保留 app/build/outputs/apk/release/*-release.apk）
 ```
 
-CI（GitHub Actions）在 tag `v*` 或手动 `workflow_dispatch` 时用相同脚本打包，并上传 Release 资产。
+CI（GitHub Actions）在 tag `v*` 或手动 `workflow_dispatch` 时用同一 Gradle 任务打包，并上传 Release 资产。
 
-本地调试签名 keystore 由 `build.sh` 自动生成（**不入库**）。发行版签名由 Actions 每次临时生成，或自行替换。
+### 签名
+
+**默认用 Android Debug Keystore 签 release**（CI 无需额外 Secret，Release 可持续产出）。  
+换自己的签名（推荐长期更新同一包）：
+
+```bash
+# 生成
+keytool -genkeypair -keystore release.keystore -alias z9xmanager \
+  -keyalg RSA -keysize 2048 -validity 10000
+
+# 在 app/build.gradle.kts 的 android { } 内增加：
+# signingConfigs {
+#   create("release") {
+#     storeFile = file("release.keystore")   // 或从环境变量读
+#     storePassword = System.getenv("STORE_PASSWORD")
+#     keyAlias = "z9xmanager"
+#     keyPassword = System.getenv("KEY_PASSWORD")
+#   }
+# }
+# buildTypes.release.signingConfig = signingConfigs.getByName("release")
+```
+
+GitHub Actions 可用 Secrets：`STORE_PASSWORD` / `KEY_PASSWORD` / `KEYSTORE_BASE64`（把 keystore base64 后写入），在 workflow 里解码再签。未配置时继续走 debug 签名。
+
+> 从 1.0.x（手搓 keystore）升到 1.1.0（debug 签）时，**签名指纹会变**，需先卸载旧包再装，或自行用同一 keystore 重签。
 
 ## 实机侧载（GMUI）
 
-1. 将 `Z9XManager-v1.0.0.apk` 拷到 U 盘 → 文件管理器安装（允许未知来源）
+1. 将 `Z9XManager-v1.1.0.apk` 拷到 U 盘 → 文件管理器安装（允许未知来源）
 2. 打开 **极米助手** → ① 网络 ADB / ② 预装包 / ③ Aerial
 3. 若需完整 debloat / Aerial 设为桌面：电脑 `adb connect <IP>:5555` 后执行 App 内「复制」给出的命令
 

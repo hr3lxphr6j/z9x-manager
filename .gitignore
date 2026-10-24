@@ -1,9 +1,14 @@
-build/
+/.gradle/
+/build/
+/app/build/
+/local.properties
 *.keystore
+!app/debug.keystore
 *.idsig
 .DS_Store
 .idea/
 *.iml
-local.properties
 *.apk
 !releases/*.apk
+captures/
+.cxx/
